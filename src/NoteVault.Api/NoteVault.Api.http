@@ -1,6 +1,0 @@
-@NoteVault.Api_HostAddress = http://localhost:5170
-
-GET {{NoteVault.Api_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
