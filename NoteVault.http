@@ -1,0 +1,34 @@
+@NoteVault_HostAddress = http://localhost:5170
+
+### 1. View all notes (GET /api/notes)
+GET {{NoteVault_HostAddress}}/api/notes
+Accept: application/json
+
+### 2. Search notes by title query (GET /api/notes?search=welcome)
+GET {{NoteVault_HostAddress}}/api/notes?search=welcome
+Accept: application/json
+
+### 3. Create a note (POST /api/notes)
+POST {{NoteVault_HostAddress}}/api/notes
+Content-Type: application/json
+
+{
+  "title": "Learn C# and ASP.NET Core",
+  "content": "Master controllers, dependency injection, and Entity Framework Core."
+}
+
+### 4. Read one note by ID (GET /api/notes/{id})
+GET {{NoteVault_HostAddress}}/api/notes/3
+Accept: application/json
+
+### 5. Edit a note (PUT /api/notes/{id})
+PUT {{NoteVault_HostAddress}}/api/notes/3
+Content-Type: application/json
+
+{
+  "title": "Welcome to NoteVault (Updated)",
+  "content": "Updated content: minimal, focused, and production-ready architecture."
+}
+
+### 6. Delete a note (DELETE /api/notes/{id})
+DELETE {{NoteVault_HostAddress}}/api/notes/3
