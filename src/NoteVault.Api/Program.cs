@@ -7,6 +7,17 @@ var builder = WebApplication.CreateBuilder(args);
 // 1. Add services to the dependency injection container
 builder.Services.AddControllers();
 
+// Configure CORS for local development flexibility
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 // Configure Entity Framework Core with SQL Server
 builder.Services.AddDbContext<NoteVaultDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -53,6 +64,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors();
+
+// Enable serving default files (index.html) and static files from wwwroot
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseAuthorization();
 

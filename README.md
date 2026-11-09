@@ -28,6 +28,7 @@ A minimal, focused REST API built with **C#**, **ASP.NET Core Web API**, **Entit
 | **Entity Framework Core 8** | Database ORM, migrations, and LINQ querying |
 | **Microsoft SQL Server** | Persistent relational storage (`.\SQLEXPRESS` / `NoteVaultDb`) |
 | **Swagger / OpenAPI** | Interactive API documentation and testing UI |
+| **Vanilla HTML + Tailwind CSS + JS** | Lightweight, zero-build frontend served via `wwwroot` |
 | **Git & GitHub** | Version control |
 
 ---

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteVault — Minimal Note Taking</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Navbar / Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
+          <!-- Vault/Notebook Icon -->
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 tracking-tight leading-none">NoteVault</h1>
+          <p class="text-xs text-slate-500 mt-0.5">Minimal Notes API & UI</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <a href="/swagger" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+          <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+          Swagger Docs
+        </a>
+        <button id="openCreateBtn" 
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+          <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          New Note
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+    
+    <!-- Search & Stats Bar -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <!-- Search Input (Feature: Search notes by title) -->
+      <div class="relative flex-1 max-w-md">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <input type="text" id="searchInput" 
+               placeholder="Search notes by title..." 
+               class="w-full pl-10 pr-9 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all shadow-sm">
+        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Notes Count Indicator -->
+      <div class="text-sm text-slate-500 font-medium" id="notesCountText">
+        Loading notes...
+      </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div id="loadingState" class="py-16 flex flex-col items-center justify-center text-slate-400">
+      <svg class="animate-spin h-8 w-8 text-slate-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span class="text-sm">Fetching your notes...</span>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="hidden py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
+      <div class="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400 mb-3">
+        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      </div>
+      <h3 class="text-base font-semibold text-slate-900" id="emptyTitle">No notes found</h3>
+      <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1" id="emptySubtitle">You haven't created any notes yet. Click the button below to get started.</p>
+      <button id="emptyCreateBtn" class="mt-4 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm">
+        Create First Note
+      </button>
+    </div>
+
+    <!-- Notes Grid (Feature: View notes) -->
+    <div id="notesGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Notes cards will be dynamically rendered here -->
+    </div>
+
+  </main>
+
+  <!-- Note Modal (Create & Edit) -->
+  <div id="noteModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <!-- Backdrop -->
+    <div id="modalBackdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
+    
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all border border-slate-100">
+        <!-- Modal Header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 class="text-base font-bold text-slate-900" id="modalHeading">New Note</h3>
+          <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Modal Form -->
+        <form id="noteForm" class="p-6 space-y-4">
+          <input type="hidden" id="noteId" value="">
+
+          <!-- Error Alert Banner -->
+          <div id="formErrorBanner" class="hidden bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg p-3"></div>
+
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label for="noteTitle" class="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Title <span class="text-rose-500">*</span>
+              </label>
+              <span id="titleCounter" class="text-xs text-slate-400">0 / 100</span>
+            </div>
+            <input type="text" id="noteTitle" required maxlength="100" 
+                   placeholder="Enter note title..." 
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all">
+          </div>
+
+          <div>
+            <label for="noteContent" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Content <span class="text-rose-500">*</span>
+            </label>
+            <textarea id="noteContent" rows="6" required 
+                      placeholder="Write your note content here..." 
+                      class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all resize-y"></textarea>
+          </div>
+
+          <!-- Actions -->
+          <div class="pt-2 flex items-center justify-end space-x-3">
+            <button type="button" id="cancelModalBtn" 
+                    class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors">
+              Cancel
+            </button>
+            <button type="submit" id="saveNoteBtn" 
+                    class="inline-flex items-center px-5 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+              <span id="saveBtnText">Save Note</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div id="deleteBackdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"></div>
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden p-6 border border-slate-100">
+        <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-slate-900 mb-1">Delete Note</h3>
+        <p class="text-sm text-slate-500 mb-6" id="deletePromptText">Are you sure you want to delete this note? This action cannot be undone.</p>
+        <div class="flex items-center justify-end space-x-3">
+          <button id="cancelDeleteBtn" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            Cancel
+          </button>
+          <button id="confirmDeleteBtn" class="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm transition-colors">
+            Delete Note
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-200 bg-white py-4">
+    <div class="max-w-6xl mx-auto px-4 text-center text-xs text-slate-400">
+      NoteVault &bull; ASP.NET Core Web API &bull; EF Core &bull; SQL Server
+    </div>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
