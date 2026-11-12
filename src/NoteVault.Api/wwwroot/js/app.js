@@ -1,13 +1,33 @@
-// NoteVault - Minimal Vanilla JS Frontend
+// NoteVault - Minimal Vanilla JS Frontend with JWT Authentication
 
-const API_BASE_URL = '/api/notes';
+const NOTES_API_URL = '/api/notes';
+const AUTH_API_URL = '/api/auth';
+const TOKEN_KEY = 'notevault_token';
+const USER_KEY = 'notevault_username';
 
 // State
-let allNotes = [];
+let authMode = 'login'; // 'login' | 'register'
 let noteToDeleteId = null;
 let searchDebounceTimer = null;
 
-// DOM Elements
+// DOM Elements - Auth
+const authSection = document.getElementById('authSection');
+const notesSection = document.getElementById('notesSection');
+const authHeaderActions = document.getElementById('authHeaderActions');
+const userBadgeName = document.getElementById('userBadgeName');
+const logoutBtn = document.getElementById('logoutBtn');
+
+const tabLoginBtn = document.getElementById('tabLoginBtn');
+const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+const authHeading = document.getElementById('authHeading');
+const authSubheading = document.getElementById('authSubheading');
+const authForm = document.getElementById('authForm');
+const authUsernameInput = document.getElementById('authUsername');
+const authPasswordInput = document.getElementById('authPassword');
+const authSubmitBtn = document.getElementById('authSubmitBtn');
+const authErrorBanner = document.getElementById('authErrorBanner');
+
+// DOM Elements - Notes
 const notesGrid = document.getElementById('notesGrid');
 const loadingState = document.getElementById('loadingState');
 const emptyState = document.getElementById('emptyState');
@@ -43,12 +63,18 @@ const toastContainer = document.getElementById('toastContainer');
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-  loadNotes();
   setupEventListeners();
+  syncAuthView();
 });
 
 // --- Event Listeners ---
 function setupEventListeners() {
+  // Auth mode tabs
+  tabLoginBtn.addEventListener('click', () => setAuthMode('login'));
+  tabRegisterBtn.addEventListener('click', () => setAuthMode('register'));
+  authForm.addEventListener('submit', handleAuthSubmit);
+  logoutBtn.addEventListener('click', () => logoutUser('Signed out successfully.'));
+
   // Search input with debounce (GET /api/notes?search=...)
   searchInput.addEventListener('input', (e) => {
     const val = e.target.value;
@@ -66,15 +92,15 @@ function setupEventListeners() {
     loadNotes();
   });
 
-  // Modal open/close
+  // Note modal open/close
   openCreateBtn.addEventListener('click', () => openNoteModal());
   emptyCreateBtn.addEventListener('click', () => openNoteModal());
   closeModalBtn.addEventListener('click', closeNoteModal);
   cancelModalBtn.addEventListener('click', closeNoteModal);
   modalBackdrop.addEventListener('click', closeNoteModal);
 
-  // Form submit (Create / Edit)
-  noteForm.addEventListener('submit', handleFormSubmit);
+  // Note form submit (Create / Edit)
+  noteForm.addEventListener('submit', handleNoteFormSubmit);
 
   // Character counter for title
   noteTitleInput.addEventListener('input', (e) => {
@@ -95,42 +121,185 @@ function setupEventListeners() {
   });
 }
 
-// --- API Calls ---
+// --- Session & Auth Helpers ---
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function saveSession(token, username) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(USER_KEY, username);
+}
+
+function clearSession() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+function syncAuthView() {
+  const token = getToken();
+  const username = localStorage.getItem(USER_KEY);
+  const isAuthenticated = Boolean(token);
+
+  authSection.classList.toggle('hidden', isAuthenticated);
+  notesSection.classList.toggle('hidden', !isAuthenticated);
+  authHeaderActions.classList.toggle('hidden', !isAuthenticated);
+
+  if (isAuthenticated) {
+    userBadgeName.textContent = username || 'User';
+    loadNotes(searchInput.value.trim());
+  } else {
+    notesGrid.innerHTML = '';
+    searchInput.value = '';
+    clearSearchBtn.classList.add('hidden');
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  clearBannerError(authErrorBanner);
+
+  const isLogin = mode === 'login';
+  tabLoginBtn.className = isLogin
+    ? 'py-2 text-xs font-semibold rounded-lg bg-white text-slate-900 shadow-sm transition-all'
+    : 'py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition-all';
+  tabRegisterBtn.className = !isLogin
+    ? 'py-2 text-xs font-semibold rounded-lg bg-white text-slate-900 shadow-sm transition-all'
+    : 'py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition-all';
+
+  authHeading.textContent = isLogin ? 'Sign in to NoteVault' : 'Create your NoteVault account';
+  authSubheading.textContent = isLogin
+    ? 'Access your private notes securely with your account.'
+    : 'Choose a username and password (min 6 characters).';
+  authPasswordInput.autocomplete = isLogin ? 'current-password' : 'new-password';
+  authSubmitBtn.textContent = isLogin ? 'Sign In' : 'Create Account';
+}
+
+function logoutUser(toastMessage = null, toastType = 'success') {
+  clearSession();
+  closeNoteModal();
+  closeDeleteModal();
+  authForm.reset();
+  syncAuthView();
+  if (toastMessage) {
+    showToast(toastMessage, toastType);
+  }
+}
+
+async function authFetch(url, options = {}) {
+  const token = getToken();
+  const headers = {
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    logoutUser('Session expired. Please sign in again.', 'error');
+    throw new Error('Unauthorized');
+  }
+
+  return response;
+}
+
+async function extractApiError(res, fallbackMessage) {
+  const data = await res.json().catch(() => null);
+  if (data?.errors) {
+    return Object.values(data.errors).flat().join(' ');
+  }
+  if (data?.message) {
+    return data.message;
+  }
+  return fallbackMessage;
+}
+
+// --- Auth API Calls ---
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  clearBannerError(authErrorBanner);
+
+  const username = authUsernameInput.value.trim();
+  const password = authPasswordInput.value;
+
+  if (!username || !password) {
+    showBannerError(authErrorBanner, 'Username and password are required.');
+    return;
+  }
+
+  const isLogin = authMode === 'login';
+  const endpoint = isLogin ? `${AUTH_API_URL}/login` : `${AUTH_API_URL}/register`;
+  const originalText = authSubmitBtn.textContent;
+  authSubmitBtn.textContent = isLogin ? 'Signing in...' : 'Creating account...';
+  authSubmitBtn.disabled = true;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    if (!res.ok) {
+      const msg = await extractApiError(res, isLogin ? 'Invalid credentials.' : 'Registration failed.');
+      throw new Error(msg);
+    }
+
+    const authData = await res.json();
+    saveSession(authData.token, authData.username);
+    authForm.reset();
+    showToast(isLogin ? `Welcome back, ${authData.username}!` : `Account created for ${authData.username}!`, 'success');
+    syncAuthView();
+  } catch (err) {
+    showBannerError(authErrorBanner, err.message || 'Authentication failed.');
+  } finally {
+    authSubmitBtn.textContent = originalText;
+    authSubmitBtn.disabled = false;
+  }
+}
+
+// --- Notes API Calls ---
 
 // 1 & 2. Read all notes / Search notes (GET /api/notes?search=...)
 async function loadNotes(searchTerm = '') {
+  if (!getToken()) return;
   showLoading(true);
 
   try {
-    const url = searchTerm 
-      ? `${API_BASE_URL}?search=${encodeURIComponent(searchTerm)}` 
-      : API_BASE_URL;
+    const url = searchTerm
+      ? `${NOTES_API_URL}?search=${encodeURIComponent(searchTerm)}`
+      : NOTES_API_URL;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch notes.');
+    const res = await authFetch(url);
+    if (!res.ok) {
+      throw new Error(await extractApiError(res, 'Failed to fetch notes.'));
+    }
 
     const notes = await res.json();
-    allNotes = notes;
     renderNotes(notes, searchTerm);
   } catch (err) {
-    console.error('Error loading notes:', err);
-    showToast('Failed to load notes. Please check connection.', 'error');
+    if (err.message !== 'Unauthorized') {
+      console.error('Error loading notes:', err);
+      showToast('Failed to load notes. Please check connection.', 'error');
+    }
   } finally {
     showLoading(false);
   }
 }
 
 // 3. Create Note (POST /api/notes) or Edit Note (PUT /api/notes/{id})
-async function handleFormSubmit(e) {
+async function handleNoteFormSubmit(e) {
   e.preventDefault();
-  clearFormErrors();
+  clearBannerError(formErrorBanner);
 
   const id = noteIdInput.value;
   const title = noteTitleInput.value.trim();
   const content = noteContentInput.value.trim();
 
   if (!title || !content) {
-    showFormError('Title and content are required.');
+    showBannerError(formErrorBanner, 'Title and content are required.');
     return;
   }
 
@@ -140,29 +309,27 @@ async function handleFormSubmit(e) {
 
   try {
     const method = isEditing ? 'PUT' : 'POST';
-    const url = isEditing ? `${API_BASE_URL}/${id}` : API_BASE_URL;
+    const url = isEditing ? `${NOTES_API_URL}/${id}` : NOTES_API_URL;
 
-    const res = await fetch(url, {
-      method: method,
+    const res = await authFetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, content })
     });
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => null);
-      if (errorData && errorData.errors) {
-        const errorMessages = Object.values(errorData.errors).flat().join(' ');
-        throw new Error(errorMessages);
-      }
-      throw new Error(isEditing ? 'Failed to update note.' : 'Failed to create note.');
+      const msg = await extractApiError(res, isEditing ? 'Failed to update note.' : 'Failed to create note.');
+      throw new Error(msg);
     }
 
     closeNoteModal();
     showToast(isEditing ? 'Note updated successfully!' : 'Note created successfully!', 'success');
     await loadNotes(searchInput.value.trim());
   } catch (err) {
-    console.error('Error saving note:', err);
-    showFormError(err.message || 'An error occurred while saving.');
+    if (err.message !== 'Unauthorized') {
+      console.error('Error saving note:', err);
+      showBannerError(formErrorBanner, err.message || 'An error occurred while saving.');
+    }
   } finally {
     saveBtnText.textContent = originalBtnText;
   }
@@ -177,20 +344,22 @@ async function handleConfirmDelete() {
   confirmDeleteBtn.disabled = true;
 
   try {
-    const res = await fetch(`${API_BASE_URL}/${noteToDeleteId}`, {
+    const res = await authFetch(`${NOTES_API_URL}/${noteToDeleteId}`, {
       method: 'DELETE'
     });
 
     if (!res.ok && res.status !== 204) {
-      throw new Error('Failed to delete note.');
+      throw new Error(await extractApiError(res, 'Failed to delete note.'));
     }
 
     closeDeleteModal();
     showToast('Note deleted successfully.', 'success');
     await loadNotes(searchInput.value.trim());
   } catch (err) {
-    console.error('Error deleting note:', err);
-    showToast('Failed to delete note.', 'error');
+    if (err.message !== 'Unauthorized') {
+      console.error('Error deleting note:', err);
+      showToast('Failed to delete note.', 'error');
+    }
   } finally {
     confirmDeleteBtn.textContent = originalText;
     confirmDeleteBtn.disabled = false;
@@ -203,8 +372,8 @@ function renderNotes(notes, searchTerm = '') {
   notesGrid.innerHTML = '';
 
   const total = notes.length;
-  notesCountText.textContent = searchTerm 
-    ? `Found ${total} ${total === 1 ? 'note' : 'notes'} for "${searchTerm}"` 
+  notesCountText.textContent = searchTerm
+    ? `Found ${total} ${total === 1 ? 'note' : 'notes'} for "${searchTerm}"`
     : `${total} ${total === 1 ? 'note' : 'notes'} saved`;
 
   if (total === 0) {
@@ -230,7 +399,6 @@ function renderNotes(notes, searchTerm = '') {
     const card = document.createElement('div');
     card.className = 'group relative flex flex-col justify-between bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md hover:border-slate-300 transition-all';
 
-    // Format date nicely
     const dateFormatted = formatDate(note.createdAt);
 
     card.innerHTML = `
@@ -270,12 +438,8 @@ function renderNotes(notes, searchTerm = '') {
       </div>
     `;
 
-    // Attach button event listeners
-    const editBtn = card.querySelector('.edit-btn');
-    editBtn.addEventListener('click', () => openNoteModal(note));
-
-    const deleteBtn = card.querySelector('.delete-btn');
-    deleteBtn.addEventListener('click', () => openDeleteModal(note));
+    card.querySelector('.edit-btn').addEventListener('click', () => openNoteModal(note));
+    card.querySelector('.delete-btn').addEventListener('click', () => openDeleteModal(note));
 
     notesGrid.appendChild(card);
   });
@@ -284,7 +448,7 @@ function renderNotes(notes, searchTerm = '') {
 // --- Modal Helpers ---
 
 function openNoteModal(note = null) {
-  clearFormErrors();
+  clearBannerError(formErrorBanner);
   if (note) {
     modalHeading.textContent = 'Edit Note';
     noteIdInput.value = note.id;
@@ -320,14 +484,14 @@ function closeDeleteModal() {
   deleteModal.classList.add('hidden');
 }
 
-function showFormError(message) {
-  formErrorBanner.textContent = message;
-  formErrorBanner.classList.remove('hidden');
+function showBannerError(el, message) {
+  el.textContent = message;
+  el.classList.remove('hidden');
 }
 
-function clearFormErrors() {
-  formErrorBanner.textContent = '';
-  formErrorBanner.classList.add('hidden');
+function clearBannerError(el) {
+  el.textContent = '';
+  el.classList.add('hidden');
 }
 
 function showLoading(isLoading) {
@@ -339,7 +503,7 @@ function showLoading(isLoading) {
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
   const bgColor = type === 'error' ? 'bg-rose-600' : 'bg-slate-900';
-  const icon = type === 'error' 
+  const icon = type === 'error'
     ? `<svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`
     : `<svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
 
@@ -348,12 +512,10 @@ function showToast(message, type = 'success') {
 
   toastContainer.appendChild(toast);
 
-  // Trigger animation in
   requestAnimationFrame(() => {
     toast.classList.remove('translate-y-2', 'opacity-0');
   });
 
-  // Remove after 3.5s
   setTimeout(() => {
     toast.classList.add('opacity-0', 'translate-y-2');
     setTimeout(() => toast.remove(), 300);

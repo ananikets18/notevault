@@ -38,7 +38,7 @@
 
   <!-- Navbar / Header -->
   <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
           <!-- Vault/Notebook Icon -->
@@ -52,80 +52,144 @@
         </div>
       </div>
 
-      <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2.5 sm:space-x-3">
         <a href="/swagger" target="_blank" rel="noopener noreferrer" 
            class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
-          <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="w-3.5 h-3.5 sm:mr-1.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
           </svg>
-          Swagger Docs
+          <span class="hidden sm:inline">Swagger Docs</span>
         </a>
-        <button id="openCreateBtn" 
-                class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
-          <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          New Note
-        </button>
+
+        <!-- Authenticated Header Controls -->
+        <div id="authHeaderActions" class="hidden flex items-center space-x-2.5">
+          <span id="userBadge" class="hidden sm:inline-flex items-center px-2.5 py-1 text-xs font-medium text-slate-700 bg-emerald-50 border border-emerald-200 rounded-lg">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+            <span id="userBadgeName"></span>
+          </span>
+          <button id="openCreateBtn" 
+                  class="inline-flex items-center px-3.5 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+            <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New Note
+          </button>
+          <button id="logoutBtn" title="Sign out"
+                  class="inline-flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-lg transition-colors">
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   </header>
 
   <!-- Main Content -->
   <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-    
-    <!-- Search & Stats Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-      <!-- Search Input (Feature: Search notes by title) -->
-      <div class="relative flex-1 max-w-md">
-        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+
+    <!-- Authentication Section (Shown when logged out) -->
+    <section id="authSection" class="max-w-md mx-auto my-8">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-6 pt-6 pb-4 border-b border-slate-100">
+          <h2 id="authHeading" class="text-lg font-bold text-slate-900">Sign in to NoteVault</h2>
+          <p id="authSubheading" class="text-xs text-slate-500 mt-1">Access your private notes securely with your account.</p>
+
+          <!-- Mode Tabs -->
+          <div class="grid grid-cols-2 gap-1.5 p-1 mt-5 bg-slate-100 rounded-xl">
+            <button type="button" id="tabLoginBtn" 
+                    class="py-2 text-xs font-semibold rounded-lg bg-white text-slate-900 shadow-sm transition-all">
+              Sign In
+            </button>
+            <button type="button" id="tabRegisterBtn" 
+                    class="py-2 text-xs font-semibold rounded-lg text-slate-500 hover:text-slate-800 transition-all">
+              Create Account
+            </button>
+          </div>
+        </div>
+
+        <form id="authForm" class="p-6 space-y-4">
+          <div id="authErrorBanner" class="hidden bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg p-3"></div>
+
+          <div>
+            <label for="authUsername" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Username
+            </label>
+            <input type="text" id="authUsername" required minlength="3" maxlength="50" autocomplete="username"
+                   placeholder="e.g. dev_user"
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all">
+          </div>
+
+          <div>
+            <label for="authPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
+              Password
+            </label>
+            <input type="password" id="authPassword" required minlength="6" maxlength="100" autocomplete="current-password"
+                   placeholder="Minimum 6 characters"
+                   class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all">
+          </div>
+
+          <button type="submit" id="authSubmitBtn"
+                  class="w-full py-2.5 px-4 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
+            Sign In
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Notes Section (Shown when authenticated) -->
+    <section id="notesSection" class="hidden">
+      <!-- Search & Stats Bar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <!-- Search Input (Feature: Search notes by title) -->
+        <div class="relative flex-1 max-w-md">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input type="text" id="searchInput" 
+                 placeholder="Search your notes by title..." 
+                 class="w-full pl-10 pr-9 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all shadow-sm">
+          <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Notes Count Indicator -->
+        <div class="text-sm text-slate-500 font-medium" id="notesCountText">
+          Loading notes...
+        </div>
+      </div>
+
+      <!-- Loading Spinner -->
+      <div id="loadingState" class="hidden py-16 flex flex-col items-center justify-center text-slate-400">
+        <svg class="animate-spin h-8 w-8 text-slate-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span class="text-sm">Fetching your notes...</span>
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
+        <div class="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400 mb-3">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         </div>
-        <input type="text" id="searchInput" 
-               placeholder="Search notes by title..." 
-               class="w-full pl-10 pr-9 py-2 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent transition-all shadow-sm">
-        <button id="clearSearchBtn" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+        <h3 class="text-base font-semibold text-slate-900" id="emptyTitle">No notes found</h3>
+        <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1" id="emptySubtitle">You haven't created any notes yet. Click the button below to get started.</p>
+        <button id="emptyCreateBtn" class="mt-4 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm">
+          Create First Note
         </button>
       </div>
 
-      <!-- Notes Count Indicator -->
-      <div class="text-sm text-slate-500 font-medium" id="notesCountText">
-        Loading notes...
+      <!-- Notes Grid (Feature: View notes) -->
+      <div id="notesGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Notes cards will be dynamically rendered here -->
       </div>
-    </div>
-
-    <!-- Loading Spinner -->
-    <div id="loadingState" class="py-16 flex flex-col items-center justify-center text-slate-400">
-      <svg class="animate-spin h-8 w-8 text-slate-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-      </svg>
-      <span class="text-sm">Fetching your notes...</span>
-    </div>
-
-    <!-- Empty State -->
-    <div id="emptyState" class="hidden py-16 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white/50">
-      <div class="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400 mb-3">
-        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      </div>
-      <h3 class="text-base font-semibold text-slate-900" id="emptyTitle">No notes found</h3>
-      <p class="text-sm text-slate-500 max-w-sm mx-auto mt-1" id="emptySubtitle">You haven't created any notes yet. Click the button below to get started.</p>
-      <button id="emptyCreateBtn" class="mt-4 inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm">
-        Create First Note
-      </button>
-    </div>
-
-    <!-- Notes Grid (Feature: View notes) -->
-    <div id="notesGrid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <!-- Notes cards will be dynamically rendered here -->
-    </div>
+    </section>
 
   </main>
 
@@ -233,9 +297,10 @@
             <span class="text-base font-bold text-slate-900 tracking-tight">NoteVault</span>
           </div>
           <p class="text-xs text-slate-500 leading-relaxed max-w-md">
-            A minimal, production-grade notes application demonstrating RESTful architecture, Entity Framework Core ORM, and SQL Server persistence with zero extraneous bloat.
+            A minimal, production-grade notes application demonstrating RESTful architecture, JWT authentication, ownership authorization, Entity Framework Core ORM, and SQL Server persistence.
           </p>
           <div class="flex flex-wrap gap-1.5 pt-1">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">JWT Auth</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">Create</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">View All</span>
             <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700">Edit</span>
@@ -258,7 +323,7 @@
             </li>
             <li class="flex items-center space-x-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-              <span>Entity Framework Core</span>
+              <span>JWT Bearer &bull; EF Core</span>
             </li>
             <li class="flex items-center space-x-1.5">
               <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
@@ -290,7 +355,7 @@
                 <svg class="w-3.5 h-3.5 mr-1.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
                 </svg>
-                Raw JSON API (/api/notes)
+                Protected API (/api/notes)
               </a>
             </li>
             <li>
@@ -298,7 +363,7 @@
                 <svg class="w-3.5 h-3.5 mr-1.5 text-emerald-500" fill="currentColor" viewBox="0 0 8 8">
                   <circle cx="4" cy="4" r="3" />
                 </svg>
-                Single Entity &bull; 5 Endpoints
+                JWT Secured &bull; User Isolated
               </span>
             </li>
           </ul>

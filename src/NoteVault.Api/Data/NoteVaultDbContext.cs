@@ -5,7 +5,7 @@ namespace NoteVault.Api.Data;
 
 /// <summary>
 /// Entity Framework Core Database Context for NoteVault.
-/// Manages connection to SQL Server and maps the Note entity to the Notes table.
+/// Manages connection to SQL Server and maps Users and Notes tables.
 /// </summary>
 public class NoteVaultDbContext : DbContext
 {
@@ -14,13 +14,39 @@ public class NoteVaultDbContext : DbContext
     {
     }
 
+    public DbSet<User> Users => Set<User>();
     public DbSet<Note> Notes => Set<Note>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
-        // Configure single table Notes with exact schema requested
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("Users");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Username)
+                .IsRequired()
+                .HasMaxLength(50)
+                .HasColumnType("nvarchar(50)");
+
+            entity.HasIndex(e => e.Username)
+                .IsUnique();
+
+            entity.Property(e => e.PasswordHash)
+                .IsRequired()
+                .HasColumnType("nvarchar(max)");
+
+            entity.Property(e => e.CreatedAt)
+                .IsRequired()
+                .HasColumnType("datetime");
+        });
+
         modelBuilder.Entity<Note>(entity =>
         {
             entity.ToTable("Notes");
@@ -42,6 +68,11 @@ public class NoteVaultDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .IsRequired()
                 .HasColumnType("datetime");
+
+            entity.HasOne(e => e.User)
+                .WithMany(u => u.Notes)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

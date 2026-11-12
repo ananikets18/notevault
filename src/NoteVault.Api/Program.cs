@@ -1,6 +1,12 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using NoteVault.Api.Data;
+using NoteVault.Api.Models.Entities;
+using NoteVault.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,7 +28,39 @@ builder.Services.AddCors(options =>
 builder.Services.AddDbContext<NoteVaultDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Configure Swagger / OpenAPI
+// Register authentication services
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+builder.Services.AddScoped<JwtService>();
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+{
+    throw new InvalidOperationException("Jwt:Key must be configured and at least 32 bytes long.");
+}
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "NoteVault.Api";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "NoteVault.Client";
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ClockSkew = TimeSpan.Zero
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// Configure Swagger / OpenAPI with JWT Bearer authorization support
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -30,7 +68,32 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "NoteVault API",
         Version = "v1",
-        Description = "A clean, minimal REST API for NoteVault built with ASP.NET Core and Entity Framework Core."
+        Description = "A clean, minimal REST API for NoteVault with JWT authentication and ownership authorization."
+    });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter your JWT token obtained from POST /api/auth/login or /api/auth/register."
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
@@ -71,6 +134,7 @@ app.UseCors();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace NoteVault.Api.Models.Entities;
 
 /// <summary>
-/// Represents the Note entity corresponding to the single 'Notes' table in SQL Server.
+/// Represents the Note entity corresponding to the 'Notes' table in SQL Server.
+/// Each note belongs to a single User via UserId.
 /// </summary>
 [Table("Notes")]
 public class Note
@@ -24,4 +26,10 @@ public class Note
 
     [Column(TypeName = "datetime")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Required]
+    public int UserId { get; set; }
+
+    [JsonIgnore]
+    public User? User { get; set; }
 }

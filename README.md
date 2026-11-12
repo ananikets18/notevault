@@ -1,20 +1,21 @@
 # NoteVault
 
-A minimal, focused notes application built with **C#**, **ASP.NET Core Web API**, **Entity Framework Core**, and **Microsoft SQL Server**, featuring a lightweight **Tailwind CSS** frontend and **Swagger** API explorer.
+A minimal, focused notes application built with **C#**, **ASP.NET Core Web API**, **JWT Bearer Authentication**, **Entity Framework Core**, and **Microsoft SQL Server**, featuring a lightweight **Tailwind CSS** frontend and **Swagger** API explorer.
 
 ---
 
-## 1. Features (Only 5)
+## 1. Features
 
 | Feature | Functionality |
 | :--- | :--- |
-| **Create notes** | Provide title and content |
-| **View notes** | Display all saved notes (ordered newest first) |
-| **Edit notes** | Update title and content of an existing note |
-| **Delete notes** | Remove a note by ID |
-| **Search notes** | Filter notes by title using query parameter `?search=` |
+| **Register & Sign In** | Username & password accounts with PBKDF2 hashing and JWT Bearer tokens |
+| **Create notes** | Provide title and content (scoped to the authenticated user) |
+| **View notes** | Display all notes owned by the signed-in user (ordered newest first) |
+| **Edit notes** | Update title and content of your own note (`403 Forbidden` for others) |
+| **Delete notes** | Remove your own note by ID (`403 Forbidden` for others) |
+| **Search notes** | Filter your notes by title using query parameter `?search=` |
 
-> *No bookmarks, tags, categories, pinning, authentication, or dashboards. Zero bloat.*
+> *Clean and concise: no bookmarks, tags, categories, pinning, or dashboards.*
 
 ---
 
@@ -25,15 +26,25 @@ A minimal, focused notes application built with **C#**, **ASP.NET Core Web API**
 | **Language** | C# 12 | Strongly-typed backend programming |
 | **Framework** | .NET 8 LTS | High-performance development platform |
 | **Web API** | ASP.NET Core Web API | RESTful controllers, routing, and model validation |
+| **Auth** | JWT Bearer + `PasswordHasher<User>` | Stateless token authentication and user-ownership authorization |
 | **ORM** | Entity Framework Core 8 | Code-first migrations, DbSet, and LINQ queries |
 | **Database** | Microsoft SQL Server | Relational persistence (`.\SQLEXPRESS` / `NoteVaultDb`) |
-| **API Testing** | Swagger / OpenAPI | Interactive browser documentation and testing (`/swagger`) |
+| **API Testing** | Swagger / OpenAPI | Interactive browser documentation with Bearer **Authorize** modal |
 | **Frontend** | Vanilla HTML5 + Tailwind CSS + JS | Zero-build, responsive UI served directly via `wwwroot` |
-| **Version Control**| Git & GitHub | Source tracking |
+| **Version Control** | Git & GitHub | Source tracking |
 
 ---
 
-## 3. Database Schema (Just One Table)
+## 3. Database Schema (2 Tables)
+
+### `Users` Table
+
+| Column | Type | Nullable | Details |
+| :--- | :--- | :--- | :--- |
+| `Id` | `int` | No | Primary Key, Identity `(1, 1)` |
+| `Username` | `nvarchar(50)` | No | Unique index (`IX_Users_Username`) |
+| `PasswordHash` | `nvarchar(max)` | No | PBKDF2 salted password hash |
+| `CreatedAt` | `datetime` | No | Account creation timestamp (UTC) |
 
 ### `Notes` Table
 
@@ -43,98 +54,74 @@ A minimal, focused notes application built with **C#**, **ASP.NET Core Web API**
 | `Title` | `nvarchar(100)` | No | Note title (Max length: 100 characters) |
 | `Content` | `nvarchar(max)` | No | Full note body text |
 | `CreatedAt` | `datetime` | No | Timestamp recorded in UTC |
-
-*Only one entity. No relationships.*
+| `UserId` | `int` | No | Foreign Key to `Users.Id` (`ON DELETE CASCADE`) |
 
 ---
 
-## 4. Only 5 API Endpoints
+## 4. API Endpoints
+
+### Authentication Endpoints (`/api/auth`)
 
 | Method | Endpoint | Purpose | Request Body | Status Codes |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/notes` | Create a note | `CreateNoteDto` | `201 Created`, `400 Bad Request` |
-| `GET` | `/api/notes` | Read all notes | *None* | `200 OK` |
-| `GET` | `/api/notes?search={term}` | Search notes by title | *None* | `200 OK` |
-| `GET` | `/api/notes/{id}` | Read one note by ID | *None* | `200 OK`, `404 Not Found` |
-| `PUT` | `/api/notes/{id}` | Update title & content | `UpdateNoteDto` | `200 OK`, `400 Bad Request`, `404 Not Found` |
-| `DELETE` | `/api/notes/{id}` | Delete a note | *None* | `204 No Content`, `404 Not Found` |
+| `POST` | `/api/auth/register` | Register a user & get JWT | `RegisterDto` | `201 Created`, `400 Bad Request`, `409 Conflict` |
+| `POST` | `/api/auth/login` | Sign in & get JWT | `LoginDto` | `200 OK`, `400 Bad Request`, `401 Unauthorized` |
 
-### Sample JSON Payloads
+### Protected Note Endpoints (`/api/notes`, requires `Authorization: Bearer <token>`)
 
-#### Create / Update Note (`POST /api/notes` or `PUT /api/notes/{id}`)
-```json
-{
-  "title": "Learning ASP.NET Core",
-  "content": "Mastering controllers, dependency injection, and EF Core."
-}
-```
-
-#### Note Response (`200 OK` / `201 Created`)
-```json
-{
-  "id": 1,
-  "title": "Learning ASP.NET Core",
-  "content": "Mastering controllers, dependency injection, and EF Core.",
-  "createdAt": "2026-11-09T08:30:00Z"
-}
-```
+| Method | Endpoint | Purpose | Request Body | Status Codes |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/notes` | Create a note | `CreateNoteDto` | `201 Created`, `400 Bad Request`, `401 Unauthorized` |
+| `GET` | `/api/notes` | Read all owned notes | *None* | `200 OK`, `401 Unauthorized` |
+| `GET` | `/api/notes?search={term}` | Search owned notes by title | *None* | `200 OK`, `401 Unauthorized` |
+| `GET` | `/api/notes/{id}` | Read one owned note by ID | *None* | `200 OK`, `401`, `403 Forbidden`, `404 Not Found` |
+| `PUT` | `/api/notes/{id}` | Update owned note | `UpdateNoteDto` | `200 OK`, `400`, `401`, `403 Forbidden`, `404 Not Found` |
+| `DELETE` | `/api/notes/{id}` | Delete owned note | *None* | `204 No Content`, `401`, `403 Forbidden`, `404 Not Found` |
 
 ---
 
-## 5. What This Project Demonstrates
-
-Even with this minimal footprint, the application covers 12 essential software engineering concepts:
-
-1. **C# Classes & Objects**: Entity class `Note`, DTO models `CreateNoteDto` and `UpdateNoteDto`.
-2. **Properties & Constructors**: Auto-implemented properties (`{ get; set; }`) and constructor dependency injection.
-3. **ASP.NET Core Controllers**: `[ApiController]` and `[Route("api/[controller]")]` inheriting from `ControllerBase`.
-4. **HTTP Methods & Status Codes**: `[HttpPost]` (`201 Created`), `[HttpGet]` (`200 OK`), `[HttpPut]` (`200 OK`), `[HttpDelete]` (`204 NoContent`), `400 BadRequest`, and `404 NotFound`.
-5. **Dependency Injection**: Registering `NoteVaultDbContext` in `Program.cs` and injecting it into controllers.
-6. **Entity Framework Core**: Code-first modeling, migrations, and tracking.
-7. **DbContext & DbSet**: `NoteVaultDbContext : DbContext` managing `DbSet<Note> Notes`.
-8. **SQL Server Integration**: `UseSqlServer` with connection strings and automatic schema creation on startup.
-9. **LINQ Queries**: Query filtering with `.Where(n => n.Title.Contains(search))`, sorting with `.OrderByDescending(n => n.CreatedAt)`, `.ToListAsync()`, and `.FindAsync(id)`.
-10. **Model Validation**: Data Annotations (`[Required]`, `[StringLength(100)]`) returning RFC 9110 ProblemDetails on invalid input.
-11. **Exception Handling**: Safe database migration try-catch logging and standard ASP.NET Core developer diagnostics.
-12. **CRUD Operations**: Clean, idiomatic implementation of Create, Read, Update, and Delete operations.
-
----
-
-## 6. Project Structure
+## 5. Project Structure
 
 ```text
 NoteVault/
-├── NoteVault.sln                     # Visual Studio / .NET Solution
-├── NoteVault.http                    # Executable HTTP test file for VS / VS Code
-├── README.md                         # Documentation
+├── NoteVault.sln                          # Visual Studio / .NET Solution
+├── NoteVault.http                         # Executable HTTP test file for VS / VS Code
+├── README.md                              # Documentation
 │
 └── src/
     └── NoteVault.Api/
         ├── Controllers/
-        │   └── NotesController.cs    # 5 CRUD & Search API endpoints
+        │   ├── AuthController.cs          # Register & Login endpoints
+        │   └── NotesController.cs         # 5 JWT-protected CRUD & Search endpoints
         ├── Data/
-        │   └── NoteVaultDbContext.cs # EF Core DbContext with Notes table mapping
-        ├── Migrations/               # EF Core migrations (InitialCreate)
+        │   └── NoteVaultDbContext.cs      # EF Core DbContext (Users & Notes)
+        ├── Migrations/                    # EF Core migrations
         ├── Models/
         │   ├── DTOs/
-        │   │   ├── CreateNoteDto.cs  # Validation contract for creating notes
-        │   │   └── UpdateNoteDto.cs  # Validation contract for updating notes
+        │   │   ├── AuthResponseDto.cs     # Token, Username, ExpiresAt
+        │   │   ├── CreateNoteDto.cs       # Validation contract for creating notes
+        │   │   ├── LoginDto.cs            # Login payload
+        │   │   ├── RegisterDto.cs         # Registration payload
+        │   │   └── UpdateNoteDto.cs       # Validation contract for updating notes
         │   └── Entities/
-        │       └── Note.cs           # Database entity mapped to Notes table
+        │       ├── Note.cs                # Note entity linked to User via UserId
+        │       └── User.cs                # User entity
+        ├── Services/
+        │   └── JwtService.cs              # Signs and issues JWT Bearer tokens
         ├── Properties/
-        │   └── launchSettings.json   # Development server launch profiles
-        ├── wwwroot/                  # Lightweight static frontend
-        │   ├── index.html            # Tailwind CSS Single-Page UI
+        │   └── launchSettings.json        # Development server launch profiles
+        ├── wwwroot/                       # Lightweight static frontend
+        │   ├── index.html                 # Tailwind CSS Auth & Notes UI
         │   └── js/
-        │       └── app.js            # Vanilla JS calling the 5 API endpoints
-        ├── appsettings.json          # SQL Server connection string
-        ├── appsettings.Development.json
-        └── Program.cs                # App setup, DI, Swagger, and static files
+        │       └── app.js                 # Vanilla JS calling /api/auth & /api/notes
+        ├── appsettings.json               # SQL Server & JWT config template
+        ├── appsettings.Development.json   # Local development SQL & JWT key
+        └── Program.cs                     # App setup, DI, JWT auth, Swagger, static files
 ```
 
 ---
 
-## 7. Getting Started
+## 6. Getting Started
 
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
@@ -147,9 +134,11 @@ dotnet run --project src/NoteVault.Api
 ```
 
 Once running:
-- **Web UI**: Open [http://localhost:5170](http://localhost:5170) to interact with the frontend.
-- **Swagger UI**: Open [http://localhost:5170/swagger](http://localhost:5170/swagger) for interactive API documentation.
-- The database `NoteVaultDb` and table `Notes` are automatically migrated on startup.
+- **Web UI**: Open [http://localhost:5170](http://localhost:5170) to register/sign in and manage your private notes.
+- **Swagger UI**: Open [http://localhost:5170/swagger](http://localhost:5170/swagger), call `POST /api/auth/login` or `/register`, click **Authorize**, and enter your JWT token to test protected endpoints.
+- The database `NoteVaultDb` and tables (`Users`, `Notes`) are automatically migrated on startup.
+
+> **Production Note**: Configure `Jwt:Key` (at least 32 characters) via User Secrets or environment variables (`Jwt__Key`) before deploying outside Development.
 
 ### Test via .http File
-Open [`NoteVault.http`](NoteVault.http) in Visual Studio or VS Code (with the REST Client extension) to execute requests with one click.
+Open [`NoteVault.http`](NoteVault.http) in Visual Studio or VS Code (with the REST Client extension) to register, log in, and execute authenticated requests.

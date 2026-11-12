@@ -1,34 +1,64 @@
 @NoteVault_HostAddress = http://localhost:5170
 
-### 1. View all notes (GET /api/notes)
-GET {{NoteVault_HostAddress}}/api/notes
-Accept: application/json
+### 1. Register a new user (POST /api/auth/register)
+POST {{NoteVault_HostAddress}}/api/auth/register
+Content-Type: application/json
 
-### 2. Search notes by title query (GET /api/notes?search=welcome)
-GET {{NoteVault_HostAddress}}/api/notes?search=welcome
-Accept: application/json
+{
+  "username": "dev_user",
+  "password": "Password123!"
+}
+
+### 2. Login to get a JWT token (POST /api/auth/login)
+# @name login
+POST {{NoteVault_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "dev_user",
+  "password": "Password123!"
+}
+
+@token = {{login.response.body.token}}
 
 ### 3. Create a note (POST /api/notes)
+# @name createNote
 POST {{NoteVault_HostAddress}}/api/notes
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "title": "Learn C# and ASP.NET Core",
-  "content": "Master controllers, dependency injection, and Entity Framework Core."
+  "content": "Master controllers, dependency injection, JWT authentication, and Entity Framework Core."
 }
 
-### 4. Read one note by ID (GET /api/notes/{id})
-GET {{NoteVault_HostAddress}}/api/notes/3
+@noteId = {{createNote.response.body.id}}
+
+### 4. View all notes belonging to the logged-in user (GET /api/notes)
+GET {{NoteVault_HostAddress}}/api/notes
+Authorization: Bearer {{token}}
 Accept: application/json
 
-### 5. Edit a note (PUT /api/notes/{id})
-PUT {{NoteVault_HostAddress}}/api/notes/3
+### 5. Search notes by title query (GET /api/notes?search=ASP.NET)
+GET {{NoteVault_HostAddress}}/api/notes?search=ASP.NET
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 6. Read one note by ID (GET /api/notes/{id})
+GET {{NoteVault_HostAddress}}/api/notes/{{noteId}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 7. Edit a note (PUT /api/notes/{id})
+PUT {{NoteVault_HostAddress}}/api/notes/{{noteId}}
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "title": "Welcome to NoteVault (Updated)",
-  "content": "Updated content: minimal, focused, and production-ready architecture."
+  "title": "Learn C# and ASP.NET Core (Updated)",
+  "content": "Updated content with JWT Bearer authentication and user-ownership authorization."
 }
 
-### 6. Delete a note (DELETE /api/notes/{id})
-DELETE {{NoteVault_HostAddress}}/api/notes/3
+### 8. Delete a note (DELETE /api/notes/{id})
+DELETE {{NoteVault_HostAddress}}/api/notes/{{noteId}}
+Authorization: Bearer {{token}}
