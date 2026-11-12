@@ -15,8 +15,6 @@ A minimal, focused notes application built with **C#**, **ASP.NET Core Web API**
 | **Delete notes** | Remove your own note by ID (`403 Forbidden` for others) |
 | **Search notes** | Filter your notes by title using query parameter `?search=` |
 
-> *Clean and concise: no bookmarks, tags, categories, pinning, or dashboards.*
-
 ---
 
 ## 2. Minimal Technology Stack
@@ -137,8 +135,3 @@ Once running:
 - **Web UI**: Open [http://localhost:5170](http://localhost:5170) to register/sign in and manage your private notes.
 - **Swagger UI**: Open [http://localhost:5170/swagger](http://localhost:5170/swagger), call `POST /api/auth/login` or `/register`, click **Authorize**, and enter your JWT token to test protected endpoints.
 - The database `NoteVaultDb` and tables (`Users`, `Notes`) are automatically migrated on startup.
-
-> **Production Note**: Configure `Jwt:Key` (at least 32 characters) via User Secrets or environment variables (`Jwt__Key`) before deploying outside Development.
-
-### Test via .http File
-Open [`NoteVault.http`](NoteVault.http) in Visual Studio or VS Code (with the REST Client extension) to register, log in, and execute authenticated requests.
